@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>UNLIGHT-Revive token exporter</title>
+<style type="text/css">
+html, body {
+	background-color: #111;
+	text-align: center;
+	color: #a00;
+}
+#copy {
+	width: 80vw;
+}
+textarea {
+	width: 80%;
+	height: 50vh;
+	font-size: 2em;
+	font-family: monospace;
+}
+.btn {
+	box-shadow:inset 0px 1px 0px 0px #ffffff;
+	background:linear-gradient(to bottom, #ffffff 5%, #f6f6f6 100%);
+	background-color:#ffffff;
+	border-radius:6px;
+	border:1px solid #dcdcdc;
+	display:inline-block;
+	cursor:pointer;
+	color:#666666;
+	font-family:Arial;
+	font-size:2em;
+	font-weight:bold;
+	padding: .1em .6em;
+	margin: .2em .2em;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #ffffff;
+}
+.btn:hover {
+	background:linear-gradient(to bottom, #f6f6f6 5%, #ffffff 100%);
+	background-color:#f6f6f6;
+}
+.btn:active {
+	position:relative;
+	top:1px;
+}
+</style>
+
+</head>
+<body>
+<div>
+	<button id="copy" class="btn" type="submit">copy</button>
+	<div id="error"></div>
+</div>
+<textarea id="output" placeholder="token & url here..." spellcheck="false" readonly></textarea>
+
+<!-- <div id="a001"></div><hr/>
+<div id="a002"></div><hr/>
+<div id="a003"></div><hr/>
+<div id="a004"></div><hr/> -->
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script type="text/javascript">
+	let out = document.querySelector('#output');
+	document.querySelector('#copy').addEventListener('click', function(e){
+		out.select()
+		document.execCommand('copy')
+	}, false);
+
+	// context
+	const ctx = {};
+
+	// check & init steam api
+	const initEnv = (ctx) => {
+		let ok = false
+		if (typeof nw !== 'undefined' && typeof nw.require === 'function') {
+			// NWJS環境
+			ctx.greenworks = require('./greenworks.js');
+			console.log("Running in NWJS environment");
+			if (ctx.greenworks.init()) {
+				console.log("Steam initialized successfully");
+				ok = true;
+			} else {
+				console.log("Steam initialization failed");
+			}
+		} else if (typeof require !== 'undefined') {
+			// Node.js環境（NWJSのNode context含む）
+			console.log("Running in Node.js environment");
+		} else {
+			// ブラウザ環境
+			console.log("Running in browser environment");
+		}
+		return ok;
+	}
+
+	// steam api
+	// TODO: fix this API
+	const initSteamAPI = (ctx) => {
+		ctx.greenworks.getAchievement('ACHIEVEMENT_0', (value) => { console.log(value); })
+		const achievement_state = (_achievement) => {
+			const achievement = _achievement;
+			return new Promise((resolve, reject) => {
+				ctx.greenworks.getAchievement(achievement, (value) => { return resolve(value); });
+			});
+		}
+		const achievement_clear = (_achievement) => {
+			const achievement = _achievement;
+			return new Promise((resolve, reject) => {
+				ctx.greenworks.activateAchievement(achievement, (value) => { return resolve(value); });
+			});
+		}
+
+		window.onmessage = async (_params) => {
+			const params = _params;
+			if (params.data.type === 'payment') {
+				ctx.greenworks.activateGameOverlayToWebPage(params.data.params.steamurl);
+			} else if (params.data.type === 'achievement') {
+				let promise_list = [];
+				let promise_clear = [];
+				for (let i = 0; i < params.data.params.length; i++) {
+					promise_list.push(achievement_state(params.data.params[i]));
+				}
+				const state = await Promise.all(promise_list);
+				for (let i = 0; i < params.data.params.length; i++) {
+					if (state[i] === false) { promise_clear.push(achievement_clear(params.data.params[i])); }
+				}
+				await Promise.all(promise_clear);
+			}
+		}
+	};
+	const initSteamAuth = async (ctx) => {
+		return new Promise((resolve, reject) => {
+			const username = ctx.greenworks.getSteamId();
+			// document.querySelector('#a001').innerText = JSON.stringify(username);
+
+			ctx.greenworks.getEncryptedAppTicket('unlight', (ticket) => {
+				const ticket_hex = ticket.toString('hex');
+				let data = {
+					userData: username,
+					ticket: ticket // ??? _hex?
+				}
+				// document.querySelector('#a002').innerText = JSON.stringify(data);
+				resolve(data);
+			}, (error) => {
+				enticket(); // ???? undefined?
+				reject(error);
+			});
+		});
+	}
+
+	(async() => {
+		if (initEnv(ctx)) {
+			// steam api is ok
+			initSteamAPI(ctx);
+
+			// auth
+			const authData = await initSteamAuth(ctx);
+			const username = authData.userData;
+			const socket = io(`https://www.playunlight-yiylzpm2ugvd227f.site:${Math.trunc(Math.random() * 15) + 12002}`);
+			// console.log('socket', socket);
+			socket.on('access_token', (_token) => {
+				const token = _token;
+				// document.querySelector('#a003').innerText = token;
+				// document.querySelector('#a004').innerText = `https://www.playunlight.online?steamid=${username.steamId}&token=${token}`;
+				out.value = `https://www.playunlight.online?steamid=${username.steamId}&token=${token}`;
+				socket.disconnect();
+			});
+			socket.on("connect", () => {
+				socket.emit('authenticate', authData);
+			});
+		}
+	})();
+
+</script>
+</body>
+</html>

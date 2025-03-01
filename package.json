@@ -1,0 +1,12 @@
+{
+  "name": "unlight_revive",
+  "main": "index2.html",
+  "window": {
+    "icon": "/icon.png",
+    "width": 760,
+    "height": 680,
+    "resizable": false,
+    "fullscreen": false
+  },
+    "chromium-args": "--ignore-gpu-blacklist"
+}

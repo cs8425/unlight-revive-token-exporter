@@ -3,7 +3,7 @@
 
 ## 使用方式
 
-1. 打開UNLIGHT-Revive的遊戲檔案資料夾(用``)
+1. 打開UNLIGHT-Revive的遊戲檔案資料夾(用`瀏覽本機檔案`)
 2. 複製`index2.html`到資料夾內
 3. 修改`package.json`內的這行`"main": "index.html"`, 改成`"main": "index2.html"`
 4. 用steam啟動`UNLIGHT-Revive`
